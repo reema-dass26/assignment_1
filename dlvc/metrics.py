@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import torch
-from datasets.cifar10 import CIFAR10Dataset
+from dlvc.datasets.cifar10 import CIFAR10Dataset
 
 class PerformanceMeasure(metaclass=ABCMeta):
     '''
@@ -54,20 +54,23 @@ class Accuracy(PerformanceMeasure):
         self.correct_count = 0
         self.total_count = 0
 
-    def update(self, prediction: torch.Tensor, 
-               target: torch.Tensor) -> None:
+    def update(self, prediction: torch.Tensor, target: torch.Tensor) -> None:
         '''
         Update the measure by comparing predicted data with ground-truth target data.
         prediction must have shape (s,c) with each row being a class-score vector.
         target must have shape (s,) and values between 0 and c-1 (true class labels).
         Raises ValueError if the data shape or values are unsupported.
         '''
+        print(prediction)
+        print(target)
+
+
         try:
             self.predictions=prediction
             self.targets=target
 
             for pred, true in zip(prediction, target):
-                if pred == true:
+                if pred:
                     self.correct_count += 1
                 self.total_count += 1
         except ValueError as e:
@@ -126,7 +129,7 @@ class Accuracy(PerformanceMeasure):
         
         for pred, true in zip(self.predictions, self.targets):
                 per_class_total_count[true] += 1
-                if pred == true:
+                if pred:
                     per_class_correct_count[true] += 1
         
         per_class_accuracy = [correct / total if total != 0 else 0 for correct, total in zip(per_class_correct_count, per_class_total_count)]

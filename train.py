@@ -13,6 +13,10 @@ from dlvc.datasets.cifar10 import CIFAR10Dataset
 from dlvc.datasets.dataset import Subset
 
 
+from torchvision.models import resnet18
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import StepLR
+
 
 
 
@@ -33,17 +37,25 @@ def train(args):
                             v2.Normalize(mean = [0.485, 0.456,0.406], std = [0.229, 0.224, 0.225])])
     
     
-    train_data = ...
+    train_data = CIFAR10Dataset(fdir=args.file_dir, subset=Subset.TRAINING, transform=train_transform)
     
-    val_data = ...
+    val_data = CIFAR10Dataset(fdir=args.file_dir, subset=Subset.VALIDATION, transform=val_transform)
     
- 
-        
-    device = ... 
+    
+    # Check if CUDA (GPU) is available
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        print('Using GPU:', torch.cuda.get_device_name())
+    else:
+        device = torch.device('cpu')
+        print('CUDA is not available. Using CPU.')
 
-    model = DeepClassifier(...)
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    
+
+    model = DeepClassifier(resnet18())
     model.to(device)
-    optimizer = ...
+    optimizer = AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
     loss_fn = torch.nn.CrossEntropyLoss()
     
     train_metric = Accuracy(classes=train_data.classes)
@@ -53,7 +65,7 @@ def train(args):
     model_save_dir = Path("saved_models")
     model_save_dir.mkdir(exist_ok=True)
 
-    lr_scheduler = ...
+    lr_scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
     
     trainer = ImgClassificationTrainer(model, 
                     optimizer,
@@ -76,6 +88,7 @@ if __name__ == "__main__":
     args = argparse.ArgumentParser(description='Training')
     args.add_argument('-d', '--gpu_id', default='0', type=str,
                       help='index of which GPU to use')
+    args.add_argument('-f', '--file_dir', type=str, help='directory containing CIFAR10')
     
     if not isinstance(args, tuple):
         args = args.parse_args()

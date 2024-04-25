@@ -3,11 +3,10 @@ from typing import Tuple
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from tqdm import tqdm
-import seaborn as sns
 import matplotlib.pyplot as plt
 
 # for wandb users:
-from dlvc.wandb_logger import WandBLogger
+#from dlvc.wandb_logger import WandBLogger
 
 class BaseTrainer(metaclass=ABCMeta):
     '''
@@ -177,3 +176,30 @@ class ImgClassificationTrainer(BaseTrainer):
                 self.lr_scheduler.step(val_loss)  # Adjust learning rate if using scheduler
         
         print("Training finished")
+
+    
+    def _plot(self):
+        epochs = range(1, self.num_epochs + 1)
+
+        # Plot training and validation loss
+        plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs, self.train_loss_history, label='Train')
+        plt.plot(epochs, self.val_loss_history, label='Validation')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss')
+        plt.legend()
+
+        # Plot training and validation accuracy
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs, self.train_accuracy_history, label='Train')
+        plt.plot(epochs, self.val_accuracy_history, label='Validation')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.title('Training and Validation Accuracy')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+
