@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 import torch
+from datasets.cifar10 import CIFAR10Dataset
 
 class PerformanceMeasure(metaclass=ABCMeta):
     '''
@@ -45,10 +46,13 @@ class Accuracy(PerformanceMeasure):
 
     def reset(self) -> None:
         '''
-        Resets the internal state.
+        Reset Method:
+        The reset method initializes or resets the internal state of the accuracy tracker. 
+        This is often used at the beginning of a new evaluation or training session to clear any previous data.
+        It resets counters or variables used to track the number of correct predictions and total predictions.
         '''
-        ## TODO implement
-        pass
+        self.correct_count = 0
+        self.total_count = 0
 
     def update(self, prediction: torch.Tensor, 
                target: torch.Tensor) -> None:
@@ -58,17 +62,37 @@ class Accuracy(PerformanceMeasure):
         target must have shape (s,) and values between 0 and c-1 (true class labels).
         Raises ValueError if the data shape or values are unsupported.
         '''
+        try:
+            self.predictions=prediction
+            self.targets=target
 
-        ## TODO implement
-        pass
+            for pred, true in zip(prediction, target):
+                if pred == true:
+                    self.correct_count += 1
+                self.total_count += 1
+        except ValueError as e:
+            print('The data shape or values are unsupported')
+            print(e)
 
     def __str__(self):
-        '''
-        Return a string representation of the performance, accuracy and per class accuracy.
-        '''
+        """
+        Generate a string representation of the performance including overall accuracy
+        and per-class accuracy.
 
-        ## TODO implement
-        pass
+        Args:
+        accuracy (float): Overall accuracy.
+        per_class_accuracy (list): List of per-class accuracies.
+
+        Returns:
+        str: String representation of the performance.
+        """
+        accuracy=self.accuracy()
+        per_class_accuracy=self.per_class_accuracy()
+        performance_str = "Overall Accuracy: {:.2f}\n".format(accuracy)
+        performance_str += "Per-class Accuracy:\n"
+        for class_idx, class_acc in enumerate(per_class_accuracy):
+            performance_str += "  Class {}: {:.2f}\n".format(class_idx, class_acc)
+        return performance_str
 
 
     def accuracy(self) -> float:
@@ -77,14 +101,36 @@ class Accuracy(PerformanceMeasure):
         Returns 0 if no data is available (after resets).
         '''
 
-        ## TODO implement
-        pass
+        if self.total_count == 0:
+            return 0
+        return self.correct_count / self.total_count
+    
+
     
     def per_class_accuracy(self) -> float:
-        '''
-        Compute and return the per class accuracy as a float between 0 and 1.
-        Returns 0 if no data is available (after resets).
-        '''
-        ## TODO implement
-        pass
+        """
+        Compute and return the per-class accuracy as a list of floats between 0 and 1.
+        Returns a list of length num_classes containing accuracies for each class.
+        Returns 0 for classes with no data available (after resets).
+
+        Args:
+        predicted_labels (list): List of predicted labels.
+        true_labels (list): List of true labels.
+        num_classes (int): Number of classes in the dataset.
+
+        Returns:
+        list: List of per-class accuracies.
+        """
+        per_class_correct_count = [0] * self.classes
+        per_class_total_count = [0] * self.classes
+        
+        for pred, true in zip(self.predictions, self.targets):
+                per_class_total_count[true] += 1
+                if pred == true:
+                    per_class_correct_count[true] += 1
+        
+        per_class_accuracy = [correct / total if total != 0 else 0 for correct, total in zip(per_class_correct_count, per_class_total_count)]
+        
+        return per_class_accuracy
+
        
