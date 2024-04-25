@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from pathlib import Path
-from torchvision.models import resnet18 as model
+import torchvision.models as models
 
 class DeepClassifier(nn.Module):
     def __init__(self, net: nn.Module):
@@ -15,8 +15,11 @@ class DeepClassifier(nn.Module):
     def save(self, save_dir: Path, suffix=None):
         '''
         Saves the model, adds suffix to filename if given
+
         '''
-        torch.save(model, save_dir)
+        model = models.resnet18(pretrained=True)
+
+        torch.save(model.state_dict(), save_dir)
 
 
     def load(self, path):
