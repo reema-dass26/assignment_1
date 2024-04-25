@@ -3,6 +3,8 @@ from typing import Tuple
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from tqdm import tqdm
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # for wandb users:
 from dlvc.wandb_logger import WandBLogger
@@ -77,57 +79,101 @@ class ImgClassificationTrainer(BaseTrainer):
             - Optionally use weights & biases for tracking metrics and loss: initializer W&B logger
 
         '''
+        self.model = model
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.lr_scheduler = lr_scheduler
+        self.train_metric = train_metric
+        self.val_metric = val_metric
+        self.train_data = train_data
+        self.val_data = val_data
+        self.device = device
+        self.num_epochs = num_epochs
+        self.training_save_dir = training_save_dir
+        self.batch_size = batch_size
+        self.val_frequency = val_frequency
         
+         # Create data loaders for training and validation datasets
+        self.train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=True)
+        self.val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size)
+        
+        self.train_loss_history = []
+        self.train_accuracy_history = []
+        self.train_pcacc_history = []
+        self.val_loss_history = []
+        self.val_accuracy_history = []
+        self.val_pcacc_history = []
 
-        ## TODO implement
-        pass
-        
         
 
     def _train_epoch(self, epoch_idx: int) -> Tuple[float, float, float]:
-        """
-        Training logic for one epoch. 
-        Prints current metrics at end of epoch.
-        Returns loss, mean accuracy and mean per class accuracy for this epoch.
+        self.model.train()  # Set model to train mode
+        train_loss = 0.0
+        self.train_metric.reset()
 
-        epoch_idx (int): Current epoch number
-        """
-        ## TODO implement
-        pass
+        for batch_idx, (data, target) in enumerate(self.train_loader):
+            data, target = data.to(self.device), target.to(self.device)
+            self.optimizer.zero_grad()
+            output = self.model(data)
+            loss = self.loss_fn(output, target)
+            train_loss += loss.item()
+            loss.backward()
+            self.optimizer.step()
+            self.train_metric.update(output, target)
+
+        mean_train_loss = train_loss / len(self.train_loader)
+        mean_train_accuracy, mean_train_pcacc = self.train_metric.compute()
+
+        self.train_loss_history.append(mean_train_loss)
+        self.train_accuracy_history.append(mean_train_accuracy)
+        self.train_pcacc_history.append(mean_train_pcacc)
+
+        print(f"Epoch {epoch_idx + 1}/{self.num_epochs}, Train Loss: {mean_train_loss:.4f}, "
+              f"Train mAcc: {mean_train_accuracy:.4f}, Train mPCAcc: {mean_train_pcacc:.4f}")
+
+        return mean_train_loss, mean_train_accuracy, mean_train_pcacc
 
         
 
 
     def _val_epoch(self, epoch_idx:int) -> Tuple[float, float, float]:
-        """
-        Validation logic for one epoch. 
-        Prints current metrics at end of epoch.
-        Returns loss, mean accuracy and mean per class accuracy for this epoch on the validation data set.
+        self.model.eval()  # Set model to evaluation mode
+        val_loss = 0.0
+        self.val_metric.reset()
 
-        epoch_idx (int): Current epoch number
-        """
-        ## TODO implement
-        pass
+        with torch.no_grad():
+            for data, target in self.val_loader:
+                data, target = data.to(self.device), target.to(self.device)
+                output = self.model(data)
+                loss = self.loss_fn(output, target)
+                val_loss += loss.item()
+                self.val_metric.update(output, target)
+
+        mean_val_loss = val_loss / len(self.val_loader)
+        mean_val_accuracy, mean_val_pcacc = self.val_metric.compute()
+
+        self.val_loss_history.append(mean_val_loss)
+        self.val_accuracy_history.append(mean_val_accuracy)
+        self.val_pcacc_history.append(mean_val_pcacc)
+
+        print(f"Epoch {epoch_idx + 1}/{self.num_epochs}, Validation Loss: {mean_val_loss:.4f}, "
+              f"Validation mAcc: {mean_val_accuracy:.4f}, Validation mPCAcc: {mean_val_pcacc:.4f}")
+
+        return mean_val_loss, mean_val_accuracy, mean_val_pcacc
 
         
 
     def train(self) -> None:
-        """
-        Full training logic that loops over num_epochs and
-        uses the _train_epoch and _val_epoch methods.
-        Save the model if mean per class accuracy on validation data set is higher
-        than currently saved best mean per class accuracy. 
-        Depending on the val_frequency parameter, validation is not performed every epoch.
-        """
-        ## TODO implement
-        pass
+        for epoch in range(self.num_epochs):
+            train_loss, train_accuracy, train_pcacc = self._train_epoch(epoch)
+            val_loss, val_accuracy, val_pcacc = self._val_epoch(epoch)
 
-                
+            if val_pcacc > self.best_val_pcacc:
+                self.best_val_pcacc = val_pcacc
+                torch.save(self.model.state_dict(), self.best_model_path)
+                print("Best model saved.")
 
-
-
-
-            
-            
-
-
+            if (epoch + 1) % self.val_frequency == 0:
+                self.lr_scheduler.step(val_loss)  # Adjust learning rate if using scheduler
+        
+        print("Training finished")
