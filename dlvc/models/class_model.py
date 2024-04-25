@@ -17,9 +17,8 @@ class DeepClassifier(nn.Module):
         Saves the model, adds suffix to filename if given
 
         '''
-        model = models.resnet18(pretrained=True)
 
-        torch.save(model.state_dict(), save_dir)
+        torch.save(self.net , save_dir)
 
 
     def load(self, path):
@@ -27,5 +26,5 @@ class DeepClassifier(nn.Module):
         Loads model from path
         Does not work with transfer model
         '''
-        model = torch.load(path)
-        model.eval()
+        self.net = torch.load(path)
+        self.net.eval()
