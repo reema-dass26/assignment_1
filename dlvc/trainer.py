@@ -6,56 +6,61 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 # for wandb users:
-#from dlvc.wandb_logger import WandBLogger
+# from dlvc.wandb_logger import WandBLogger
+
 
 class BaseTrainer(metaclass=ABCMeta):
-    '''
+    """
     Base class of all Trainers.
-    '''
+    """
 
     @abstractmethod
     def train(self) -> None:
-        '''
+        """
         Holds training logic.
-        '''
+        """
 
         pass
 
     @abstractmethod
     def _val_epoch(self) -> Tuple[float, float, float]:
-        '''
+        """
         Holds validation logic for one epoch.
-        '''
+        """
 
         pass
 
     @abstractmethod
     def _train_epoch(self) -> Tuple[float, float, float]:
-        '''
+        """
         Holds training logic for one epoch.
-        '''
+        """
 
         pass
 
+
 class ImgClassificationTrainer(BaseTrainer):
     """
-    Class that stores the logic for training a model for image classification.
+    Class that stores the logic reversefor training a model for image classification.
     """
-    def __init__(self, 
-                 model, 
-                 optimizer,
-                 loss_fn,
-                 lr_scheduler,
-                 train_metric,
-                 val_metric,
-                 train_data,
-                 val_data,
-                 device,
-                 num_epochs: int, 
-                 training_save_dir: Path,
-                 batch_size: int = 4,
-                 val_frequency: int = 5) -> None:
-        '''
+
+    def __init__(
+        self,
+        model,
+        optimizer,
+        loss_fn,
+        lr_scheduler,
+        train_metric,
+        val_metric,
+        train_data,
+        val_data,
+        device,
+        num_epochs: int,
+        training_save_dir: Path,
+        batch_size: int = 4,
+        val_frequency: int = 5,
+    ) -> None:
+        """
         Args and Kwargs:
             model (nn.Module): Deep Network to train
             optimizer (torch.optim): optimizer used to train the network
@@ -68,8 +73,8 @@ class ImgClassificationTrainer(BaseTrainer):
             device (torch.device): cuda or cpu - device used to train the network
             num_epochs (int): number of epochs to train the network
             training_save_dir (Path): the path to the folder where the best model is stored
-            batch_size (int): number of samples in one batch 
-            val_frequency (int): how often validation is conducted during training (if it is 5 then every 5th 
+            batch_size (int): number of samples in one batch
+            val_frequency (int): how often validation is conducted during training (if it is 5 then every 5th
                                 epoch we evaluate model on validation set)
 
         What does it do:
@@ -77,7 +82,7 @@ class ImgClassificationTrainer(BaseTrainer):
             - Creates data loaders for the train and validation datasets
             - Optionally use weights & biases for tracking metrics and loss: initializer W&B logger
 
-        '''
+        """
         self.model = model
         self.optimizer = optimizer
         self.loss_fn = loss_fn
@@ -91,11 +96,13 @@ class ImgClassificationTrainer(BaseTrainer):
         self.training_save_dir = training_save_dir
         self.batch_size = batch_size
         self.val_frequency = val_frequency
-        
-         # Create data loaders for training and validation datasets
-        self.train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=True)
+
+        # Create data loaders for training and validation datasets
+        self.train_loader = torch.utils.data.DataLoader(
+            train_data, batch_size=batch_size, shuffle=True
+        )
         self.val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size)
-        
+
         self.train_loss_history = []
         self.train_accuracy_history = []
         self.train_pcacc_history = []
@@ -103,14 +110,12 @@ class ImgClassificationTrainer(BaseTrainer):
         self.val_accuracy_history = []
         self.val_pcacc_history = []
 
-        
-
     def _train_epoch(self, epoch_idx: int) -> Tuple[float, float, float]:
         self.model.train()  # Set model to train mode
         train_loss = 0.0
         self.train_metric.reset()
 
-        for batch_idx, (data, target) in enumerate(self.train_loader):
+        for batch_idx, (data, target) in tqdm(enumerate(self.train_loader)):
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
@@ -127,15 +132,14 @@ class ImgClassificationTrainer(BaseTrainer):
         self.train_accuracy_history.append(mean_train_accuracy)
         self.train_pcacc_history.append(mean_train_pcacc)
 
-        print(f"Epoch {epoch_idx + 1}/{self.num_epochs}, Train Loss: {mean_train_loss:.4f}, "
-              f"Train mAcc: {mean_train_accuracy:.4f}, Train mPCAcc: {mean_train_pcacc:.4f}")
+        print(
+            f"Epoch {epoch_idx + 1}/{self.num_epochs}, Train Loss: {mean_train_loss:.4f}, "
+            f"Train mAcc: {mean_train_accuracy:.4f}, Train mPCAcc: {mean_train_pcacc:.4f}"
+        )
 
         return mean_train_loss, mean_train_accuracy, mean_train_pcacc
 
-        
-
-
-    def _val_epoch(self, epoch_idx:int) -> Tuple[float, float, float]:
+    def _val_epoch(self, epoch_idx: int) -> Tuple[float, float, float]:
         self.model.eval()  # Set model to evaluation mode
         val_loss = 0.0
         self.val_metric.reset()
@@ -155,51 +159,53 @@ class ImgClassificationTrainer(BaseTrainer):
         self.val_accuracy_history.append(mean_val_accuracy)
         self.val_pcacc_history.append(mean_val_pcacc)
 
-        print(f"Epoch {epoch_idx + 1}/{self.num_epochs}, Validation Loss: {mean_val_loss:.4f}, "
-              f"Validation mAcc: {mean_val_accuracy:.4f}, Validation mPCAcc: {mean_val_pcacc:.4f}")
+        print(
+            f"Epoch {epoch_idx + 1}/{self.num_epochs}, Validation Loss: {mean_val_loss:.4f}, "
+            f"Validation mAcc: {mean_val_accuracy:.4f}, Validation mPCAcc: {mean_val_pcacc:.4f}"
+        )
 
         return mean_val_loss, mean_val_accuracy, mean_val_pcacc
 
-        
-
     def train(self) -> None:
-        for epoch in range(self.num_epochs):
+        print("Starting")
+        for epoch in tqdm(range(self.num_epochs)):
+            # TODO Need CV?
             train_loss, train_accuracy, train_pcacc = self._train_epoch(epoch)
             val_loss, val_accuracy, val_pcacc = self._val_epoch(epoch)
 
             if val_pcacc > self.best_val_pcacc:
                 self.best_val_pcacc = val_pcacc
-                torch.save(self.model.state_dict(), self.best_model_path)
+                torch.save(self.model.state_dict(), self.training_save_dir)
                 print("Best model saved.")
 
             if (epoch + 1) % self.val_frequency == 0:
-                self.lr_scheduler.step(val_loss)  # Adjust learning rate if using scheduler
-        
+                self.lr_scheduler.step(
+                    val_loss
+                )  # Adjust learning rate if using scheduler
+
         print("Training finished")
 
-    
     def _plot(self):
         epochs = range(1, self.num_epochs + 1)
 
         # Plot training and validation loss
         plt.figure(figsize=(12, 6))
         plt.subplot(1, 2, 1)
-        plt.plot(epochs, self.train_loss_history, label='Train')
-        plt.plot(epochs, self.val_loss_history, label='Validation')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss')
+        plt.plot(epochs, self.train_loss_history, label="Train")
+        plt.plot(epochs, self.val_loss_history, label="Validation")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training and Validation Loss")
         plt.legend()
 
         # Plot training and validation accuracy
         plt.subplot(1, 2, 2)
-        plt.plot(epochs, self.train_accuracy_history, label='Train')
-        plt.plot(epochs, self.val_accuracy_history, label='Validation')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.title('Training and Validation Accuracy')
+        plt.plot(epochs, self.train_accuracy_history, label="Train")
+        plt.plot(epochs, self.val_accuracy_history, label="Validation")
+        plt.xlabel("Epoch")
+        plt.ylabel("Accuracy")
+        plt.title("Training and Validation Accuracy")
         plt.legend()
 
         plt.tight_layout()
         plt.show()
-

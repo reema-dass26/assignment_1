@@ -4,8 +4,6 @@ import torch.nn.functional as F
 import torch
 
 
-
-
 class YourCNN(nn.Module):
     def __init__(self):
         super().__init__()
@@ -15,5 +13,3 @@ class YourCNN(nn.Module):
     def forward(self, x):
         ## TODO implement
         pass
-
-    
