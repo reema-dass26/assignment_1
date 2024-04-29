@@ -115,7 +115,7 @@ class ImgClassificationTrainer(BaseTrainer):
         train_loss = 0.0
         self.train_metric.reset()
 
-        for batch_idx, (data, target) in tqdm(enumerate(self.train_loader)):
+        for batch_idx, (data, target) in enumerate(self.train_loader):
             data, target = data.to(self.device), target.to(self.device)
             self.optimizer.zero_grad()
             output = self.model(data)
@@ -126,15 +126,18 @@ class ImgClassificationTrainer(BaseTrainer):
             self.train_metric.update(output, target)
 
         mean_train_loss = train_loss / len(self.train_loader)
-        mean_train_accuracy, mean_train_pcacc = self.train_metric.compute()
+        mean_train_accuracy = self.train_metric.accuracy()
+        pca = self.train_metric.per_class_accuracy()
+        mean_train_pcacc = sum(pca) / len(pca)
+
 
         self.train_loss_history.append(mean_train_loss)
         self.train_accuracy_history.append(mean_train_accuracy)
         self.train_pcacc_history.append(mean_train_pcacc)
 
         print(
-            f"Epoch {epoch_idx + 1}/{self.num_epochs}, Train Loss: {mean_train_loss:.4f}, "
-            f"Train mAcc: {mean_train_accuracy:.4f}, Train mPCAcc: {mean_train_pcacc:.4f}"
+            f"Epoch {epoch_idx + 1}/{self.num_epochs}, Train Loss: {mean_train_loss}, "
+            f"Train mAcc: {mean_train_accuracy}, Train mPCAcc: {mean_train_pcacc}"
         )
 
         return mean_train_loss, mean_train_accuracy, mean_train_pcacc
@@ -153,28 +156,30 @@ class ImgClassificationTrainer(BaseTrainer):
                 self.val_metric.update(output, target)
 
         mean_val_loss = val_loss / len(self.val_loader)
-        mean_val_accuracy, mean_val_pcacc = self.val_metric.compute()
+        mean_val_accuracy = self.train_metric.accuracy()
+        pca = self.train_metric.per_class_accuracy()
+        mean_val_pcacc = sum(pca) / len(pca)
 
         self.val_loss_history.append(mean_val_loss)
         self.val_accuracy_history.append(mean_val_accuracy)
         self.val_pcacc_history.append(mean_val_pcacc)
 
         print(
-            f"Epoch {epoch_idx + 1}/{self.num_epochs}, Validation Loss: {mean_val_loss:.4f}, "
-            f"Validation mAcc: {mean_val_accuracy:.4f}, Validation mPCAcc: {mean_val_pcacc:.4f}"
+            f"Epoch {epoch_idx + 1}/{self.num_epochs}, Validation Loss: {mean_val_loss}, "
+            f"Validation mAcc: {mean_val_accuracy}, Validation mPCAcc: {mean_val_pcacc}"
         )
 
         return mean_val_loss, mean_val_accuracy, mean_val_pcacc
 
     def train(self) -> None:
-        print("Starting")
+        best_val_pcacc = 0
         for epoch in tqdm(range(self.num_epochs)):
             # TODO Need CV?
             train_loss, train_accuracy, train_pcacc = self._train_epoch(epoch)
             val_loss, val_accuracy, val_pcacc = self._val_epoch(epoch)
 
-            if val_pcacc > self.best_val_pcacc:
-                self.best_val_pcacc = val_pcacc
+            if val_pcacc > best_val_pcacc:
+                best_val_pcacc = val_pcacc
                 torch.save(self.model.state_dict(), self.training_save_dir)
                 print("Best model saved.")
 
@@ -182,14 +187,14 @@ class ImgClassificationTrainer(BaseTrainer):
                 self.lr_scheduler.step(
                     val_loss
                 )  # Adjust learning rate if using scheduler
-
-        print("Training finished")
+        self._plot()
 
     def _plot(self):
         epochs = range(1, self.num_epochs + 1)
 
         # Plot training and validation loss
         plt.figure(figsize=(12, 6))
+       
         plt.subplot(1, 2, 1)
         plt.plot(epochs, self.train_loss_history, label="Train")
         plt.plot(epochs, self.val_loss_history, label="Validation")
@@ -207,5 +212,6 @@ class ImgClassificationTrainer(BaseTrainer):
         plt.title("Training and Validation Accuracy")
         plt.legend()
 
+        plt.savefig("fig.png")
         plt.tight_layout()
         plt.show()

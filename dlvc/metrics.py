@@ -121,8 +121,8 @@ class Accuracy(PerformanceMeasure):
         Returns:
         list: List of per-class accuracies.
         """
-        per_class_correct_count = [0] * self.classes
-        per_class_total_count = [0] * self.classes
+        per_class_correct_count = [0] * len(self.classes)
+        per_class_total_count = [0] * len(self.classes)
 
         for pred, true in zip(self.predictions, self.targets):
             per_class_total_count[true] += 1
